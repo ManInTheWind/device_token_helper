@@ -1,0 +1,45 @@
+group 'com.fluttercandies.device_token_helper'
+version '1.0'
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.1.2'
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: 'com.android.library'
+
+
+android {
+    compileSdkVersion 31
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    defaultConfig {
+        minSdkVersion 16
+    }
+}
+
+dependencies {
+    //华为推送
+    implementation 'com.huawei.hms:push:6.7.0.300'
+    implementation 'com.huawei.hms:hmscoreinstaller:6.6.0.300'
+
+    // https://mvnrepository.com/artifact/io.hyphenate/hyphenate-chat
+    implementation 'io.hyphenate:hyphenate-chat:3.9.7'
+}
