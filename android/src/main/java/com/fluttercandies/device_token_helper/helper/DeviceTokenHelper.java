@@ -14,8 +14,6 @@ import com.huawei.agconnect.AGConnectOptionsBuilder;
 import com.huawei.agconnect.config.AGConnectServicesConfig;
 import com.huawei.hms.aaid.HmsInstanceId;
 import com.huawei.hms.common.ApiException;
-import com.hyphenate.chat.EMClient;
-import com.hyphenate.util.EMLog;
 
 import org.json.JSONObject;
 
@@ -28,6 +26,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
+import io.flutter.Log;
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.plugin.common.MethodChannel;
 
@@ -63,13 +62,23 @@ public class DeviceTokenHelper {
         hmsPushTokenResult.error(errorCode,errorMessage,errorDetails);
     }
 
+    /**
+     * 申请华为Push Token
+     * 1、getToken接口只有在AppGallery Connect平台开通服务后申请token才会返回成功。
+     *
+     * 2、EMUI10.0及以上版本的华为设备上，getToken接口直接返回token。如果当次调用失败Push会缓存申请，之后会自动重试申请，成功后则以onNewToken接口返回。
+     *
+     * 3、低于EMUI10.0的华为设备上，getToken接口如果返回为空，确保Push服务开通的情况下，结果后续以onNewToken接口返回。
+     *
+     * 4、服务端识别token过期后刷新token，以onNewToken接口返回。
+     */
     public void getHmsPushToken(MethodChannel.Result result) {
-        hmsPushTokenResult = result;
         try {
+            hmsPushTokenResult = result;
             // 判断是否启用FCM推送
-            if (EMClient.getInstance().isFCMAvailable()) {
-                return;
-            }
+//            if (EMClient.getInstance().isFCMAvailable()) {
+//                return;
+//            }
             if (Class.forName("com.huawei.hms.api.HuaweiApiClient") == null) {
                 hmsPushTokenResultFailureSender("-1","no huawei hms push sdk or mobile is not a huawei phone",null);
                 return;
@@ -91,25 +100,35 @@ public class DeviceTokenHelper {
                         String appId = new AGConnectOptionsBuilder().build(_activity).getString("client/app_id");
                         // 输入token标识"HCM"
                         String tokenScope = "HCM";
-                        EMLog.i(TAG, "appId: " + appId);
+                        Log.i(TAG, "appId: " + appId);
                         String token = HmsInstanceId.getInstance(_activity).getToken(appId, tokenScope);
                         //service register huawei hms push token success token:0861063044859805300017555200CN01
                         //result.success(token);
                         if(Objects.isNull(token) || TextUtils.isEmpty(token)){
-                            hmsPushTokenResultFailureSender("-1","register huawei hms push token fail!",null);
+                            Log.d(TAG, "获取token失败:" + token);
+                            //hmsPushTokenResultFailureSender("-1","register huawei hms push token fail!",null);
+                            /*
+                            I/HMSSDK_PushReceiver(30392): receive a push token: com.jalaga.toersen
+                            I/HMSSDK_RemoteService(30392): remote service bind service start
+                            I/HMSSDK_HmsMessageService(30392): start to bind
+                            I/HMSSDK_RemoteService(30392): remote service onConnected
+                            I/HMSSDK_RemoteService(30392): remote service unbindservice
+                            I/HMSSDK_HmsMessageService(30392): handle message start...
+                            I/HMSSDK_HmsMessageService(30392): onNewToken
+                             */
                             return;
                         }
-                        EMLog.d(TAG, "成功获取到token:" + token);
+                        Log.d(TAG, "成功获取到token:" + token);
                         hmsPushTokenResultSuccessSender(token);
                     } catch (Exception e) {
-                        EMLog.e(TAG, "get token failed, " + e);
+                        Log.e(TAG, "get token failed, " + e);
                         e.printStackTrace();
                     }
                 }
             }.start();
 
         } catch (Exception e) {
-
+            e.printStackTrace();
         }
 
 

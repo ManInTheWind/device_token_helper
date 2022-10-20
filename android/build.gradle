@@ -39,7 +39,4 @@ dependencies {
     //华为推送
     implementation 'com.huawei.hms:push:6.7.0.300'
     implementation 'com.huawei.hms:hmscoreinstaller:6.6.0.300'
-
-    // https://mvnrepository.com/artifact/io.hyphenate/hyphenate-chat
-    implementation 'io.hyphenate:hyphenate-chat:3.9.7'
 }

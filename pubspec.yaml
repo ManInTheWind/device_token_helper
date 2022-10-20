@@ -1,7 +1,7 @@
 name: device_token_helper
-description: assist developer to get device's token to implement the ability of the vendor push
+description: assist developer to get device token to implement the ability of the vendor push
 version: 0.0.1
-homepage:
+homepage: https://github.com/ManInTheWind/device_token_helper
 
 environment:
   sdk: '>=2.18.0 <3.0.0'

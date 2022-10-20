@@ -5,13 +5,13 @@
 Pod::Spec.new do |s|
   s.name             = 'device_token_helper'
   s.version          = '0.0.1'
-  s.summary          = 'assist developer to get device's token to implement the ability of the vendor push'
+  s.summary          = 'assist developer to get device token to implement the ability of the vendor push'
   s.description      = <<-DESC
-assist developer to get device's token to implement the ability of the vendor push
+assist developer to get device token to implement the ability of the vendor push
                        DESC
-  s.homepage         = 'http://example.com'
+  s.homepage         = 'https://github.com/ManInTheWind/device_token_helper'
   s.license          = { :file => '../LICENSE' }
-  s.author           = { 'Your Company' => 'email@example.com' }
+  s.author           = { 'kangkang' => 'kangkanglaile1205@163.com' }
   s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*'
   s.dependency 'Flutter'
