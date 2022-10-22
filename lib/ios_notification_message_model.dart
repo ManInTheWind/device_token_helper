@@ -1,28 +1,41 @@
 class IOSNotificationMessageModel {
-  Aps? aps;
-  String fromUserId;
-  String toUserId;
-  String? groupId;
-  String messageId;
+  final Aps? aps;
+  final String? fromUserId;
+  final String? toUserId;
+  final String? groupId;
+  final String? messageId;
+  final ExtensionContent? extensionContent;
+  final String? actionIdentifier;
 
-  IOSNotificationMessageModel.fromJson(Map<String, dynamic> json)
+  const IOSNotificationMessageModel()
+      : aps = null,
+        extensionContent = null,
+        fromUserId = null,
+        toUserId = null,
+        groupId = null,
+        messageId = null,
+        actionIdentifier = null;
+
+  IOSNotificationMessageModel.fromJson(Map<dynamic, dynamic> json)
       : aps = json['aps'] != null ? Aps.fromJson(json['aps']) : null,
+        extensionContent =
+            json['ext'] != null ? ExtensionContent.fromJson(json['ext']) : null,
         fromUserId = json['f'],
         toUserId = json['t'],
         groupId = json['g'],
-        messageId = json['m'];
+        messageId = json['m'],
+        actionIdentifier = json['actionIdentifier'];
 
-  Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = <String, dynamic>{};
-    if (aps != null) {
-      data['aps'] = aps!.toJson();
-    }
-    data['f'] = fromUserId;
-    data['t'] = toUserId;
-    data['g'] = groupId;
-    data['m'] = messageId;
-    return data;
-  }
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        if (aps != null) 'aps': aps!.toJson(),
+        if (extensionContent != null)
+          'extensionContent': extensionContent!.toJson(),
+        'f': fromUserId,
+        't': toUserId,
+        'g': groupId,
+        'messageId': messageId,
+        'actionIdentifier': actionIdentifier,
+      };
 }
 
 class Aps {
@@ -55,6 +68,20 @@ class Alert {
     data['body'] = body;
     return data;
   }
+}
+
+class ExtensionContent {
+  final int? notificationType;
+  final int? userId;
+
+  ExtensionContent.fromJson(Map<String, dynamic> json)
+      : notificationType = json['notificationType'],
+        userId = json['userId'];
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'notificationType': notificationType,
+        'userId': userId,
+      };
 }
 
 /*

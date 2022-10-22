@@ -30,7 +30,7 @@ public class DeviceTokenHelperPlugin implements FlutterPlugin, MethodCallHandler
 
     @Override
     public void onAttachedToEngine(@NonNull FlutterPluginBinding flutterPluginBinding) {
-        channel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), "device_token_helper");
+        channel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), "android_device_token_helper");
         channel.setMethodCallHandler(this);
         deviceTokenHelper = DeviceTokenHelper.getInstance();
     }
