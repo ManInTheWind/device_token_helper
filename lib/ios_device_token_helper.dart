@@ -1,108 +1,141 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' hide MessageHandler;
 
-import 'device_token_help.dart';
-import 'ios_notification_message_model.dart';
+class ApnsRemoteMessage {
+  ApnsRemoteMessage.fromMap(this.payload);
 
-typedef WillPresentHandler = Future<bool> Function();
+  final Map<String, dynamic> payload;
 
-/// Handler that returns true/false to decide if push alert should be displayed when in foreground.
-/// Returning true will delay onMessage callback until user actually clicks on it
-typedef OnMessageWillPresent = Future<bool> Function(
-    IOSNotificationMessageModel);
+  String? get actionIdentifier => UNNotificationAction.getIdentifier(payload);
+}
 
-class IosDeviceTokenHelper extends DeviceTokenHelper {
-  WillPresentHandler? shouldPresent;
+typedef WillPresentHandler = Future<bool> Function(ApnsRemoteMessage);
 
-  final token = ValueNotifier<String?>(null);
+enum ApnsAuthorizationStatus {
+  authorized,
+  denied,
+  notDetermined,
+  unsupported,
+}
 
-  void registerIosPluginHandler({
-    required ValueChanged<String?> tokenCallback,
-    AsyncValueSetter<IOSNotificationMessageModel>? onLaunch,
-    OnMessageWillPresent? onMessageWillPresent,
-    AsyncValueSetter<IOSNotificationMessageModel>? onMessageDidReceive,
-    Function? onTokenRequestError,
-  }) {
-    void tokenListener() {
-      tokenCallback.call(token.value);
-      if (token.value != null) {
-        token.removeListener(tokenListener);
-      }
-    }
+class IosDeviceTokenHelper {
+  final MethodChannel _channel = () {
+    assert(Platform.isIOS,
+        'ApnsPushConnectorOnly can only be created on iOS platform!');
+    return const MethodChannel('ios_push_connector');
+  }();
 
-    token.addListener(tokenListener);
-    methodChannel.setMethodCallHandler((call) async {
-      switch (call.method) {
-        case 'onTokenRequestSuccess':
-          token.value = call.arguments;
-          break;
-        case 'onTokenRequestError':
-          onTokenRequestError?.call(call.arguments);
-          break;
-        case 'onMessageWillPresent':
-          //需要在一秒内决定是否展示通知
-          return onMessageWillPresent?.call(_extractMessage(call)).timeout(
-                  const Duration(seconds: 1),
-                  onTimeout: () => false) ??
-              false;
-        case 'onLaunch':
-          onLaunch?.call(_extractMessage(call));
-          break;
-        case 'onMessageDidReceive':
-          onMessageDidReceive?.call(_extractMessage(call));
-          break;
-        default:
-          break;
-      }
-    });
-
-    methodChannel.invokeMethod("initEMLocalNotificationManager");
-  }
-
-  Future<bool?> requestNotificationPermissionsWithOption({
+  Future<bool> requestNotificationPermissions({
     bool sound = true,
     bool alert = true,
     bool badge = true,
-    bool provisional = false,
   }) async {
-    final bool? result = await methodChannel.invokeMethod<bool>(
+    final bool? result = await _channel.invokeMethod<bool>(
         'requestNotificationPermissions',
         IosNotificationSettings(
           sound: sound,
           alert: alert,
           badge: badge,
-          provisional: provisional,
         ).toMap());
     return result ?? false;
   }
 
-  Future<void> unregisterForNotification() async {
-    await methodChannel.invokeMethod("unregisterForNotification");
-    token.value = null;
+  Future<ApnsAuthorizationStatus> getAuthorizationStatus() async {
+    return _authorizationStatusForString(
+        await _channel.invokeMethod<String?>('getAuthorizationStatus', []));
   }
 
-  IOSNotificationMessageModel _extractMessage(MethodCall call) {
-    final rawJsonData = call.arguments as String?;
-    if (rawJsonData == null) {
-      return const IOSNotificationMessageModel();
+  final StreamController<IosNotificationSettings> _iosSettingsStreamController =
+      StreamController<IosNotificationSettings>.broadcast();
+
+  Stream<IosNotificationSettings> get onIosSettingsRegistered {
+    return _iosSettingsStreamController.stream;
+  }
+
+  /// Sets up [MessageHandler] for incoming messages.
+  void configureApns({
+    required ValueChanged<String?> tokenCallback,
+    AsyncValueSetter<ApnsRemoteMessage>? onMessage,
+    AsyncValueSetter<ApnsRemoteMessage>? onLaunch,
+    AsyncValueSetter<ApnsRemoteMessage>? onResume,
+  }) {
+    _channel.setMethodCallHandler((call) async {
+      switch (call.method) {
+        case 'onToken':
+          tokenCallback.call(call.arguments);
+          return null;
+        case 'onIosSettingsRegistered':
+          final obj = IosNotificationSettings._fromMap(
+              call.arguments.cast<String, bool>());
+          isDisabledByUser.value = obj.alert == false;
+          return null;
+        case 'onMessage':
+          return onMessage?.call(_extractMessage(call));
+        case 'onLaunch':
+          return onLaunch?.call(_extractMessage(call));
+        case 'onResume':
+          return onResume?.call(_extractMessage(call));
+
+        default:
+          throw UnsupportedError('Unrecognized JSON message');
+      }
+    });
+
+    _channel.invokeMethod('configure');
+  }
+
+  ApnsRemoteMessage _extractMessage(MethodCall call) {
+    final map = call.arguments as Map;
+    // fix null safety errors
+    map.putIfAbsent('contentAvailable', () => false);
+    map.putIfAbsent('mutableContent', () => false);
+    return ApnsRemoteMessage.fromMap(map.cast());
+  }
+
+  ApnsAuthorizationStatus _authorizationStatusForString(String? value) {
+    switch (value) {
+      case 'authorized':
+        return ApnsAuthorizationStatus.authorized;
+      case 'denied':
+        return ApnsAuthorizationStatus.denied;
+      case 'notDetermined':
+        return ApnsAuthorizationStatus.notDetermined;
+      case 'unsupported':
+      default:
+        return ApnsAuthorizationStatus.unsupported;
     }
-    final json = jsonDecode(rawJsonData);
-    return IOSNotificationMessageModel.fromJson(
-      Map<String, dynamic>.from(json),
+  }
+
+  /// Handler that returns true/false to decide if push alert should be displayed when in foreground.
+  /// Returning true will delay onMessage callback until user actually clicks on it
+  // WillPresentHandler? shouldPresent;
+
+  final isDisabledByUser = ValueNotifier<bool?>(null);
+
+  final token = ValueNotifier<String?>(null);
+
+  String get providerType => "APNS";
+
+  void dispose() {
+    _iosSettingsStreamController.close();
+  }
+
+  /// https://developer.apple.com/documentation/usernotifications/declaring_your_actionable_notification_types
+  Future<void> setNotificationCategories(
+      List<UNNotificationCategory> categories) {
+    return _channel.invokeMethod(
+      'setNotificationCategories',
+      categories.map((e) => e.toJson()).toList(),
     );
   }
 
-  @override
-  Future<String?> getPlatformVersion() {
-    return methodChannel.invokeMethod<String>('getPlatformVersion');
+  Future<void> unregister() async {
+    await _channel.invokeMethod('unregister');
+    token.value = null;
   }
-
-  @override
-  MethodChannel get methodChannel =>
-      const MethodChannel('ios_device_token_helper');
 }
 
 class IosNotificationSettings {
@@ -110,27 +143,96 @@ class IosNotificationSettings {
     this.sound = true,
     this.alert = true,
     this.badge = true,
-    this.provisional = false,
   });
 
   IosNotificationSettings._fromMap(Map<String, bool> settings)
       : sound = settings['sound'],
         alert = settings['alert'],
-        badge = settings['badge'],
-        provisional = settings['provisional'];
+        badge = settings['badge'];
 
   final bool? sound;
   final bool? alert;
   final bool? badge;
-  final bool? provisional;
 
-  Map<String, dynamic> toMap() => <String, bool?>{
-        'sound': sound,
-        'alert': alert,
-        'badge': badge,
-        'provisional': provisional,
-      };
+  Map<String, dynamic> toMap() {
+    return <String, bool?>{'sound': sound, 'alert': alert, 'badge': badge};
+  }
 
   @override
   String toString() => 'PushNotificationSettings ${toMap()}';
+}
+
+/// https://developer.apple.com/documentation/usernotifications/unnotificationcategory
+class UNNotificationCategory {
+  final String identifier;
+  final List<UNNotificationAction> actions;
+  final List<String> intentIdentifiers;
+  final List<UNNotificationCategoryOptions> options;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'identifier': identifier,
+      'actions': actions.map((e) => e.toJson()).toList(),
+      'intentIdentifiers': intentIdentifiers,
+      'options': _optionsToJson(options),
+    };
+  }
+
+  UNNotificationCategory({
+    required this.identifier,
+    required this.actions,
+    required this.intentIdentifiers,
+    required this.options,
+  });
+}
+
+/// https://developer.apple.com/documentation/usernotifications/UNNotificationAction
+class UNNotificationAction {
+  final String identifier;
+  final String title;
+  final List<UNNotificationActionOptions> options;
+
+  static const defaultIdentifier =
+      'com.apple.UNNotificationDefaultActionIdentifier';
+
+  /// Returns action identifier associated with this push.
+  /// May be null, UNNotificationAction.defaultIdentifier, or value declared in setNotificationCategories
+  static String? getIdentifier(Map<String, dynamic> payload) {
+    final data = payload['data'] as Map?;
+    return data?['actionIdentifier'] ?? payload['actionIdentifier'];
+  }
+
+  UNNotificationAction({
+    required this.identifier,
+    required this.title,
+    required this.options,
+  });
+
+  dynamic toJson() {
+    return {
+      'identifier': identifier,
+      'title': title,
+      'options': _optionsToJson(options),
+    };
+  }
+}
+
+/// https://developer.apple.com/documentation/usernotifications/unnotificationactionoptions
+enum UNNotificationActionOptions {
+  authenticationRequired,
+  destructive,
+  foreground,
+}
+
+/// https://developer.apple.com/documentation/usernotifications/unnotificationcategoryoptions
+enum UNNotificationCategoryOptions {
+  customDismissAction,
+  allowInCarPlay,
+  hiddenPreviewsShowTitle,
+  hiddenPreviewsShowSubtitle,
+  allowAnnouncement,
+}
+
+List<String> _optionsToJson(List values) {
+  return values.map((e) => e.toString()).toList();
 }

@@ -35,9 +35,6 @@ class _MyAppState extends State<MyApp> {
         platformVersion =
             await AndroidDeviceTokenHelper().getPlatformVersion() ??
                 'Unknown platform version';
-      } else if (Platform.isIOS) {
-        platformVersion = await IosDeviceTokenHelper().getPlatformVersion() ??
-            'Unknown platform version';
       } else {
         platformVersion = 'Failed to get platform version.';
       }

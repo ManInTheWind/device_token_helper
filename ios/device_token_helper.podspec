@@ -15,7 +15,7 @@ assist developer to get device token to implement the ability of the vendor push
   s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*'
   s.dependency 'Flutter'
-  s.dependency 'HyphenateChat'
+  
   s.platform = :ios, '9.0'
 
   # Flutter.framework does not contain a i386 slice.

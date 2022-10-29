@@ -1,13 +1,15 @@
-class IOSNotificationMessageModel {
-  final Aps? aps;
-  final String? fromUserId;
-  final String? toUserId;
-  final String? groupId;
-  final String? messageId;
-  final ExtensionContent? extensionContent;
-  final String? actionIdentifier;
+import 'dart:convert';
 
-  const IOSNotificationMessageModel()
+class IOSNotificationMessageModel {
+  Aps? aps;
+  String? fromUserId;
+  String? toUserId;
+  String? groupId;
+  String? messageId;
+  ExtensionContent? extensionContent;
+  String? actionIdentifier;
+
+  IOSNotificationMessageModel()
       : aps = null,
         extensionContent = null,
         fromUserId = null,
@@ -16,15 +18,31 @@ class IOSNotificationMessageModel {
         messageId = null,
         actionIdentifier = null;
 
-  IOSNotificationMessageModel.fromJson(Map<dynamic, dynamic> json)
-      : aps = json['aps'] != null ? Aps.fromJson(json['aps']) : null,
+  IOSNotificationMessageModel.fromJson(Map<dynamic, dynamic> json) {
+    aps = json['aps'] != null ? Aps.fromJson(json['aps']) : null;
+    try {
+      if (json['payload'] != null) {
+        if (json['payload'] is String) {
+          final jsonObject = jsonDecode(json['payload']);
+          extensionContent = ExtensionContent.fromJson(Map.from(jsonObject));
+        } else {
+          extensionContent =
+              ExtensionContent.fromJson(Map.from(json['payload']));
+        }
+      } else {
         extensionContent =
-            json['ext'] != null ? ExtensionContent.fromJson(json['ext']) : null,
-        fromUserId = json['f'],
-        toUserId = json['t'],
-        groupId = json['g'],
-        messageId = json['m'],
-        actionIdentifier = json['actionIdentifier'];
+            json['ext'] != null ? ExtensionContent.fromJson(json['ext']) : null;
+      }
+    } catch (e, s) {
+      print(e);
+      print(s);
+    }
+    fromUserId = json['f'];
+    toUserId = json['t'];
+    groupId = json['g'];
+    messageId = json['m'];
+    actionIdentifier = json['actionIdentifier'];
+  }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         if (aps != null) 'aps': aps!.toJson(),
@@ -71,11 +89,13 @@ class Alert {
 }
 
 class ExtensionContent {
-  final int? notificationType;
-  final int? userId;
+  String? notificationType;
+  String? userId;
 
   ExtensionContent.fromJson(Map<String, dynamic> json)
-      : notificationType = json['notificationType'],
+      : notificationType = json['notificationType'] is int
+            ? (json['notificationType'] as int).toString()
+            : json['notificationType'],
         userId = json['userId'];
 
   Map<String, dynamic> toJson() => <String, dynamic>{

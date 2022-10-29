@@ -1,69 +1,126 @@
 import Flutter
-import HyphenateChat
+
 import UIKit
 
-@objc public class SwiftDeviceTokenHelperPlugin: NSObject, FlutterPlugin, EMLocalNotificationDelegate {
-    // private var authorizationOptions: UNAuthorizationOptions = []
+func getFlutterError(_ error: Error) -> FlutterError {
+    let e = error as NSError
+    return FlutterError(code: "Error: \(e.code)", message: e.domain, details: error.localizedDescription)
+}
 
-    internal init(_ channel: FlutterMethodChannel) {
-        methodChannel = channel
+@objc public class SwiftDeviceTokenHelperPlugin: NSObject, FlutterPlugin, UNUserNotificationCenterDelegate {
+    internal init(channel: FlutterMethodChannel) {
+        self.channel = channel
     }
 
-    let methodChannel: FlutterMethodChannel
-
-    var launchNotification: String?
-
-    var resumingFromBackground = false
-
     public static func register(with registrar: FlutterPluginRegistrar) {
-        let channel = FlutterMethodChannel(name: "ios_device_token_helper", binaryMessenger: registrar.messenger())
+        let channel = FlutterMethodChannel(name: "ios_push_connector", binaryMessenger: registrar.messenger())
 
-        let instance = SwiftDeviceTokenHelperPlugin(channel)
+        let instance = SwiftDeviceTokenHelperPlugin(channel: channel)
 
         registrar.addMethodCallDelegate(instance, channel: channel)
 
         registrar.addApplicationDelegate(instance)
     }
 
+    let channel: FlutterMethodChannel
+    var launchNotification: [String: Any]?
+    var resumingFromBackground = false
+    
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        // print("call.method:\(call.method)")
         switch call.method {
-        case "getPlatformVersion":
-            result("iOS " + UIDevice.current.systemVersion)
-        case "configure":
-            onConfigure(result)
-        case "initEMLocalNotificationManager":
-            initEMLocalNotificationManager()
         case "requestNotificationPermissions":
             requestNotificationPermissions(call, result: result)
-        case "unregisterForNotification":
+        case "configure":
+            assert(
+                UNUserNotificationCenter.current().delegate != nil,
+                "UNUserNotificationCenter.current().delegate is not set. Check readme at https://pub.dev/packages/flutter_apns."
+            )
+            UIApplication.shared.registerForRemoteNotifications()
+
+            // check for onLaunch notification *after* configure has been ran
+            if let launchNotification = launchNotification {
+                channel.invokeMethod("onLaunch", arguments: launchNotification)
+                self.launchNotification = nil
+                return
+            }
+            result(nil)
+        case "getAuthorizationStatus":
+            getAuthorizationStatus(result)
+        case "unregister":
             UIApplication.shared.unregisterForRemoteNotifications()
             result(nil)
+        case "setNotificationCategories":
+            setNotificationCategories(arguments: call.arguments!)
+            result(nil)
         default:
+            assertionFailure(call.method)
             result(FlutterMethodNotImplemented)
         }
     }
 
-    // MARK: - 开启环信推送处理
+    func setNotificationCategories(arguments: Any) {
+        let arguments = arguments as! [[String: Any]]
+        func decodeCategory(map: [String: Any]) -> UNNotificationCategory {
+            return UNNotificationCategory(
+                identifier: map["identifier"] as! String,
+                actions: (map["actions"] as! [[String: Any]]).map(decodeAction),
+                intentIdentifiers: map["intentIdentifiers"] as! [String],
+                options: decodeCategoryOptions(data: map["options"] as! [String])
+            )
+        }
+        func decodeCategoryOptions(data: [String]) -> UNNotificationCategoryOptions {
+            let mapped = data.compactMap {
+                UNNotificationCategoryOptions.stringToValue[$0]
+            }
+            return .init(mapped)
+        }
 
-    public func initEMLocalNotificationManager() {
-        EMLocalNotificationManager.shared().launch(with: self)
+        func decodeAction(map: [String: Any]) -> UNNotificationAction {
+            return UNNotificationAction(
+                identifier: map["identifier"] as! String,
+                title: map["title"] as! String,
+                options: decodeActionOptions(data: map["options"] as! [String])
+            )
+        }
+
+        func decodeActionOptions(data: [String]) -> UNNotificationActionOptions {
+            let mapped = data.compactMap {
+                UNNotificationActionOptions.stringToValue[$0]
+            }
+            return .init(mapped)
+        }
+
+        let categories = arguments.map(decodeCategory)
+        UNUserNotificationCenter.current().setNotificationCategories(Set(categories))
     }
 
-    // MARK: - 获取权限，设置通知样式
-
+    func getAuthorizationStatus(_ result: @escaping FlutterResult) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            switch settings.authorizationStatus {
+            case .authorized:
+                result("authorized")
+            case .denied:
+                result("denied")
+            case .notDetermined:
+                result("notDetermined")
+            default:
+                result("unsupported")
+            }
+        }
+    }
+    
     func requestNotificationPermissions(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         let center = UNUserNotificationCenter.current()
         let application = UIApplication.shared
-
+        
         func readBool(_ key: String) -> Bool {
             (call.arguments as? [String: Any])?[key] as? Bool ?? false
         }
-
+        
         assert(center.delegate != nil)
-
+        
         var options = [UNAuthorizationOptions]()
-
+        
         if readBool("sound") {
             options.append(.sound)
         }
@@ -73,175 +130,163 @@ import UIKit
         if readBool("alert") {
             options.append(.alert)
         }
-
-        // var provisionalRequested = false
+        
+        var provisionalRequested = false
         if #available(iOS 12.0, *) {
             if readBool("provisional") {
                 options.append(.provisional)
-                // provisionalRequested = true
+                provisionalRequested = true
             }
         }
 
         let optionsUnion = UNAuthorizationOptions(options)
-
+        
         center.requestAuthorization(options: optionsUnion) { granted, error in
             if let error = error {
-                result(self.getFlutterError(error))
+                result(getFlutterError(error))
                 return
             }
-
+            
+            center.getNotificationSettings { settings in
+                let map = [
+                    "sound": settings.soundSetting == .enabled,
+                    "badge": settings.badgeSetting == .enabled,
+                    "alert": settings.alertSetting == .enabled,
+                    "provisional": granted && provisionalRequested
+                ]
+                
+                self.channel.invokeMethod("onIosSettingsRegistered", arguments: map)
+            }
+            
             result(granted)
         }
-
+        
         application.registerForRemoteNotifications()
     }
-
-    // MARK: - 配置回调并开始注册DeviceTolen
-
-    public func onConfigure(_ result: @escaping FlutterResult) {
-        DispatchQueue.main.async {
-            UIApplication.shared.registerForRemoteNotifications()
-        }
-        assert(
-            UNUserNotificationCenter.current().delegate != nil,
-            "UNUserNotificationCenter.current().delegate is not set. Check and add it at [AppDeletegate.didFinishLaunchingWithOptions]"
-        )
-        // 请求Token
-        UIApplication.shared.registerForRemoteNotifications()
-
-        // check for onLaunch notification *after* configure has been ran
-        if let launchNotification = launchNotification {
-            methodChannel.invokeMethod("onLaunch", arguments: launchNotification)
-            self.launchNotification = nil
-            return
-        }
-        result(nil)
-    }
-
-    // MARK: - 回调成功
-
-    public func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        // let token = deviceToken.reduce("") { $0 + String(format: "%02x", $1) }
-        // deviceToken success:bd67c2dc33cb8817a4646a5d70a4e5b542343c8e9bc0184d19a45e8d24cefb45
-        methodChannel.invokeMethod("onTokenRequestSuccess", arguments: deviceToken.hexString)
-    }
-
-    // MARK: - 回调失败
-
-    public func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        methodChannel.invokeMethod("onTokenRequestError", arguments: getFlutterError(error))
-    }
-
+    
     // MARK: - AppDelegate
-
+    
+    public func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [AnyHashable: Any] = [:]) -> Bool {
+        if let launchNotification = launchOptions[UIApplication.LaunchOptionsKey.remoteNotification] as? [String: Any] {
+            self.launchNotification = FlutterApnsSerialization.remoteMessageUserInfo(toDict: launchNotification)
+        }
+        return true
+    }
+    
     public func applicationDidEnterBackground(_ application: UIApplication) {
         resumingFromBackground = true
     }
-
+    
     public func applicationDidBecomeActive(_ application: UIApplication) {
         resumingFromBackground = false
         UIApplication.shared.applicationIconBadgeNumber = -1
     }
-
-    public func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [AnyHashable: Any] = [:]) -> Bool {
-        if let launchNotification = launchOptions[UIApplication.LaunchOptionsKey.remoteNotification] as? [String: Any] {
-            self.launchNotification = remoteMessageUserInfoToDict(launchNotification)
+    
+    public func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        channel.invokeMethod("onToken", arguments: deviceToken.hexString)
+    }
+    
+    public func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) -> Bool {
+        print("---didReceiveRemoteNotification---")
+        
+        print("userInfo:\(userInfo)")
+        
+        let userInfo = FlutterApnsSerialization.remoteMessageUserInfo(toDict: userInfo)
+        
+        if resumingFromBackground {
+            onResume(userInfo: userInfo)
+        } else {
+            channel.invokeMethod("onMessage", arguments: userInfo)
         }
-
+        
+        completionHandler(.noData)
         return true
     }
-
-    // MARK: - EMLocalNotificationDelegate
-
-    // MARK: - 收到推送消息,并决定是否展示
-
-    //! !! -在启用在线通道过程中，SDK会重写[UNUserNotificationCenter currentNotificationCenter]的delegate，如果要处理其他本地通知，需要实现EMLocalNotificationDelegate，过程如下
-
-    public func emuserNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        print("---emuserNotificationCenter willPresent---")
-        print("userInfo:\(notification.request.content.userInfo)")
-
-        /*
-         userInfo:[AnyHashable("ext"): {
-             userId = 3402125616893952;
-         }, AnyHashable("emtype"): em_custom_localpush, AnyHashable("operation"): {
-             type = 0;
-         }, AnyHashable("report"): {
-             "task_id" = 1033448775987388209;
-         }]
-         */
-
-        let userInfoStr = remoteMessageUserInfoToDict(notification.request.content.userInfo)
-
-        methodChannel.invokeMethod("onMessageWillPresent", arguments: userInfoStr) { result in
-            let shouldPresentNotication = (result as? Bool) ?? false
-            if shouldPresentNotication {
-                if #available(iOS 14.0, *) {
-                    completionHandler([.sound, .banner])
-                } else {
-                    completionHandler([.sound, .alert])
-                }
-            } else {
-                completionHandler([])
-            }
-        }
+    
+    public func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        let userInfo = notification.request.content.userInfo
+            
+//        guard userInfo["aps"] != nil else {
+//            return
+//        }
+        
+        let dict = FlutterApnsSerialization.remoteMessageUserInfo(toDict: userInfo)
+        
+        print("---willPresent---")
+        
+        print("userInfo:\(userInfo)")
+        
+        completionHandler([])
+//        channel.invokeMethod("willPresent", arguments: dict) { result in
+//            let shouldShow = (result as? Bool) ?? false
+//            if shouldShow {
+//                if #available(iOS 14.0, *) {
+//                    completionHandler([.banner, .sound])
+//                } else {
+//                    completionHandler([.alert, .sound])
+//                }
+//
+//            } else {
+//                completionHandler([])
+//                let userInfo = FlutterApnsSerialization.remoteMessageUserInfo(toDict: userInfo)
+//                self.channel.invokeMethod("onMessage", arguments: userInfo)
+//            }
+//        }
     }
-
-    // MARK: - 当用户打开应用推送通知时，此方法会被调用
-
-    public func emuserNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
-        print("---emuserNotificationCenter didReceiveResponse---")
-
-        print("userInfo:\(response.notification.request.content.userInfo)")
-
-        /*
-         userInfo:[AnyHashable("EPush"): {
-             origin = push;
-             provider = APNS;
-             report =     {
-                 "task_id" = 1033451712516085529;
-             };
-             timestamp = 1666435690596;
-         }, AnyHashable("userId"): 3402125616893952, AnyHashable("aps"): {
-             alert =     {
-                 body = "\U8bd5\U8bd5\U5e26ext\U7684";
-                 title = "\U8bd5\U8bd5\U5e26ext\U7684";
-             };
-             badge = 1;
-             "mutable-content" = 1;
-             sound = default;
-         }]
-         */
-
+    
+    public func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         var userInfo = response.notification.request.content.userInfo
-
+        print("---userNotificationCenter didReceivResponse---")
+        
+        print("userInfo:\(response.notification.request.content.userInfo)")
+        
+//        guard userInfo["aps"] != nil else {
+//            return
+//        }
+        
         userInfo["actionIdentifier"] = response.actionIdentifier
+        let dict = FlutterApnsSerialization.remoteMessageUserInfo(toDict: userInfo)
+        
+//        if launchNotification != nil {
+//            launchNotification = dict
+//            return
+//        }
 
-        let userInfoStr = remoteMessageUserInfoToDict(response.notification.request.content.userInfo)
-
-        methodChannel.invokeMethod("onMessageDidReceive", arguments: userInfoStr)
-
+        onResume(userInfo: dict)
         completionHandler()
     }
-
-    func remoteMessageUserInfoToDict(_ userInfo: [AnyHashable: Any]) -> String? {
-        var jsonData: Data?
-        do {
-            jsonData = try JSONSerialization.data(withJSONObject: userInfo, options: .prettyPrinted)
-        } catch let parseError {
-            print(parseError)
-        }
-        var str: String?
-        if let jsonData {
-            str = String(data: jsonData, encoding: .utf8)
-        }
-        return str
+    
+    func onResume(userInfo: [AnyHashable: Any]) {
+        channel.invokeMethod("onResume", arguments: userInfo)
     }
+}
 
-    func getFlutterError(_ error: Error) -> FlutterError {
-        let e = error as NSError
-        return FlutterError(code: "Error: \(e.code)", message: e.domain, details: error.localizedDescription)
-    }
+extension UNNotificationCategoryOptions {
+    static let stringToValue: [String: UNNotificationCategoryOptions] = {
+        var r: [String: UNNotificationCategoryOptions] = [:]
+        r["UNNotificationCategoryOptions.customDismissAction"] = .customDismissAction
+        r["UNNotificationCategoryOptions.allowInCarPlay"] = .allowInCarPlay
+        if #available(iOS 11.0, *) {
+            r["UNNotificationCategoryOptions.hiddenPreviewsShowTitle"] = .hiddenPreviewsShowTitle
+        }
+        if #available(iOS 11.0, *) {
+            r["UNNotificationCategoryOptions.hiddenPreviewsShowSubtitle"] = .hiddenPreviewsShowSubtitle
+        }
+        if #available(iOS 13.0, *) {
+            r["UNNotificationCategoryOptions.allowAnnouncement"] = .allowAnnouncement
+        }
+        return r
+    }()
+}
+
+extension UNNotificationActionOptions {
+    static let stringToValue: [String: UNNotificationActionOptions] = {
+        var r: [String: UNNotificationActionOptions] = [:]
+        r["UNNotificationActionOptions.authenticationRequired"] = .authenticationRequired
+        r["UNNotificationActionOptions.destructive"] = .destructive
+        r["UNNotificationActionOptions.foreground"] = .foreground
+        return r
+    }()
 }
 
 extension Data {
