@@ -31,7 +31,9 @@ import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.plugin.common.MethodChannel;
 
 public class DeviceTokenHelper {
+
     public static String TAG = DeviceTokenHelper.class.getSimpleName();
+
     private WeakReference<Activity> mActivity;
 
     private static volatile DeviceTokenHelper instance;
