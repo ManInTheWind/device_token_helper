@@ -8,8 +8,8 @@ class AndroidDeviceTokenHelper extends DeviceTokenHelper {
     return methodChannel.invokeMethod<String>('getPlatformVersion');
   }
 
-  Future<String?> getHmsPushToken() async {
-    return methodChannel.invokeMethod<String>('getHmsPushToken');
+  Future<String?> getDeviceToken() async {
+    return methodChannel.invokeMethod<String>('getDeviceToken');
   }
 
   @override

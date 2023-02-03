@@ -1,6 +1,9 @@
 package com.fluttercandies.device_token_helper.helper;
 
+import static com.fluttercandies.device_token_helper.Constant.*;
+
 import android.app.Activity;
+import android.os.Build;
 import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
@@ -24,14 +27,14 @@ public class DeviceTokenHelper {
 
     private static volatile DeviceTokenHelper instance;
 
-    private DeviceTokenHelper(){
+    private DeviceTokenHelper() {
 
     }
 
-    public static DeviceTokenHelper getInstance(){
-        if (instance == null){
-            synchronized (DeviceTokenHelper.class){
-                if (instance  == null){
+    public static DeviceTokenHelper getInstance() {
+        if (instance == null) {
+            synchronized (DeviceTokenHelper.class) {
+                if (instance == null) {
                     instance = new DeviceTokenHelper();
                 }
             }
@@ -41,23 +44,62 @@ public class DeviceTokenHelper {
 
     private MethodChannel.Result hmsPushTokenResult;
 
-    public void hmsPushTokenResultSuccessSender(String token){
+    public void hmsPushTokenResultSuccessSender(String token) {
         hmsPushTokenResult.success(token);
     }
 
     public void hmsPushTokenResultFailureSender(
-            @NonNull String errorCode, @Nullable String errorMessage, @Nullable Object errorDetails){
-        hmsPushTokenResult.error(errorCode,errorMessage,errorDetails);
+            @NonNull String errorCode, @Nullable String errorMessage, @Nullable Object errorDetails) {
+        hmsPushTokenResult.error(errorCode, errorMessage, errorDetails);
+    }
+
+
+    /**
+     * 根据手机品牌获取推送的device token
+     *
+     * @param result 回调
+     */
+    public void getDeviceToken(MethodChannel.Result result) {
+        String brand = Build.BRAND;
+        android.util.Log.d(TAG, "手机品牌:"+brand);
+        if (brand.equals(PHONE_HUAWEI1) || brand.equals(PHONE_HUAWEI2) || brand.equals(PHONE_HUAWEI3)) {
+            //华为
+            getHmsPushToken(result);
+        } else if (brand.equals(PHONE_XIAOMI)) {
+            //小米
+            result.success(null);
+        } else if (brand.equals(PHONE_OPPO1) || brand.equals(PHONE_OPPO2)) {
+            //oppo
+            result.success(null);
+        } else if (brand.equals(PHONE_MEIZU)) {
+            result.success(null);
+        } else if (brand.equals(PHONE_SONY)) {
+            result.success(null);
+        } else if (brand.equals(PHONE_SAMSUNG)) {
+            result.success(null);
+        } else if (brand.equals(PHONE_LG)) {
+            result.success(null);
+        } else if (brand.equals(PHONE_HTC)) {
+            result.success(null);
+        } else if (brand.equals(PHONE_NOVA)) {
+            result.success(null);
+        } else if (brand.equals(PHONE_LeMobile)) {
+            result.success(null);
+        } else if (brand.equals(PHONE_LENOVO)) {
+            result.success(null);
+        } else {
+            result.success(null);
+        }
     }
 
     /**
      * 申请华为Push Token
      * 1、getToken接口只有在AppGallery Connect平台开通服务后申请token才会返回成功。
-     *
+     * <p>
      * 2、EMUI10.0及以上版本的华为设备上，getToken接口直接返回token。如果当次调用失败Push会缓存申请，之后会自动重试申请，成功后则以onNewToken接口返回。
-     *
+     * <p>
      * 3、低于EMUI10.0的华为设备上，getToken接口如果返回为空，确保Push服务开通的情况下，结果后续以onNewToken接口返回。
-     *
+     * <p>
      * 4、服务端识别token过期后刷新token，以onNewToken接口返回。
      */
     public void getHmsPushToken(MethodChannel.Result result) {
@@ -68,7 +110,7 @@ public class DeviceTokenHelper {
 //                return;
 //            }
             if (Class.forName("com.huawei.hms.api.HuaweiApiClient") == null) {
-                hmsPushTokenResultFailureSender("-1","no huawei hms push sdk or mobile is not a huawei phone",null);
+                hmsPushTokenResultFailureSender("-1", "no huawei hms push sdk or mobile is not a huawei phone", null);
                 return;
             }
             Class<?> classType = Class.forName("android.os.SystemProperties");
@@ -76,7 +118,7 @@ public class DeviceTokenHelper {
             String buildVersion = (String) getMethod.invoke(classType, new Object[]{"ro.build.version.emui"});
             //在某些手机上，invoke方法不报错
             if (TextUtils.isEmpty(buildVersion)) {
-                hmsPushTokenResultFailureSender("-1","huawei hms push is unavailable!",null);
+                hmsPushTokenResultFailureSender("-1", "huawei hms push is unavailable!", null);
                 return;
             }
             new Thread() {
@@ -92,7 +134,7 @@ public class DeviceTokenHelper {
                         String token = HmsInstanceId.getInstance(_activity).getToken(appId, tokenScope);
                         //service register huawei hms push token success token:0861063044859805300017555200CN01
                         //result.success(token);
-                        if(Objects.isNull(token) || TextUtils.isEmpty(token)){
+                        if (Objects.isNull(token) || TextUtils.isEmpty(token)) {
                             Log.d(TAG, "获取token失败:" + token);
                             //hmsPushTokenResultFailureSender("-1","register huawei hms push token fail!",null);
                             /*
@@ -118,11 +160,10 @@ public class DeviceTokenHelper {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-
     }
 
-    public void onDispose(){
+
+    public void onDispose() {
         this.mActivity.clear();
         this.hmsPushTokenResult = null;
     }

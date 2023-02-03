@@ -1,6 +1,7 @@
 package com.fluttercandies.device_token_helper;
 
 import android.app.Activity;
+import android.os.Build;
 
 import androidx.annotation.NonNull;
 
@@ -39,12 +40,14 @@ public class DeviceTokenHelperPlugin  implements FlutterPlugin, MethodCallHandle
     public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
         if (call.method.equals("getPlatformVersion")) {
             result.success("Android " + android.os.Build.VERSION.RELEASE);
-        } else if (call.method.equals("getHmsPushToken")) {
-            deviceTokenHelper.getHmsPushToken(result);
+        } else if (call.method.equals("getDeviceToken")) {
+            deviceTokenHelper.getDeviceToken(result);
         } else {
             result.notImplemented();
         }
     }
+
+
 
     @Override
     public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
