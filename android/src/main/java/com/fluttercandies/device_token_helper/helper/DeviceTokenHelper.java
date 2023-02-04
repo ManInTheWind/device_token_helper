@@ -24,6 +24,7 @@ public class DeviceTokenHelper {
     public static String TAG = DeviceTokenHelper.class.getSimpleName();
 
     private WeakReference<Activity> mActivity;
+    private WeakReference<MethodChannel> methodChannel;
 
     private static volatile DeviceTokenHelper instance;
 
@@ -41,56 +42,48 @@ public class DeviceTokenHelper {
         }
         return instance;
     }
-
-    private MethodChannel.Result hmsPushTokenResult;
-
-    public void hmsPushTokenResultSuccessSender(String token) {
-        hmsPushTokenResult.success(token);
-    }
-
-    public void hmsPushTokenResultFailureSender(
-            @NonNull String errorCode, @Nullable String errorMessage, @Nullable Object errorDetails) {
-        hmsPushTokenResult.error(errorCode, errorMessage, errorDetails);
+    public void getDeviceBrand(MethodChannel.Result result) {
+        result.success(Build.BRAND);
     }
 
 
-    /**
-     * 根据手机品牌获取推送的device token
-     *
-     * @param result 回调
-     */
-    public void getDeviceToken(MethodChannel.Result result) {
-        String brand = Build.BRAND;
-        android.util.Log.d(TAG, "手机品牌:"+brand);
-        if (brand.equals(PHONE_HUAWEI1) || brand.equals(PHONE_HUAWEI2) || brand.equals(PHONE_HUAWEI3)) {
-            //华为
-            getHmsPushToken(result);
-        } else if (brand.equals(PHONE_XIAOMI)) {
-            //小米
-            result.success(null);
-        } else if (brand.equals(PHONE_OPPO1) || brand.equals(PHONE_OPPO2)) {
-            //oppo
-            result.success(null);
-        } else if (brand.equals(PHONE_MEIZU)) {
-            result.success(null);
-        } else if (brand.equals(PHONE_SONY)) {
-            result.success(null);
-        } else if (brand.equals(PHONE_SAMSUNG)) {
-            result.success(null);
-        } else if (brand.equals(PHONE_LG)) {
-            result.success(null);
-        } else if (brand.equals(PHONE_HTC)) {
-            result.success(null);
-        } else if (brand.equals(PHONE_NOVA)) {
-            result.success(null);
-        } else if (brand.equals(PHONE_LeMobile)) {
-            result.success(null);
-        } else if (brand.equals(PHONE_LENOVO)) {
-            result.success(null);
-        } else {
-            result.success(null);
-        }
-    }
+//    /**
+//     * 根据手机品牌获取推送的device token
+//     *
+//     * @param result 回调
+//     */
+//    public void getDeviceToken(MethodChannel.Result result) {
+//        String brand = Build.BRAND;
+//        android.util.Log.d(TAG, "手机品牌:"+brand);
+//        if (brand.equals(PHONE_HUAWEI1) || brand.equals(PHONE_HUAWEI2) || brand.equals(PHONE_HUAWEI3)) {
+//            //华为
+//            getHmsPushToken(result);
+//        } else if (brand.equals(PHONE_XIAOMI)) {
+//            //小米
+//            result.success(null);
+//        } else if (brand.equals(PHONE_OPPO1) || brand.equals(PHONE_OPPO2)) {
+//            //oppo
+//            result.success(null);
+//        } else if (brand.equals(PHONE_MEIZU)) {
+//            result.success(null);
+//        } else if (brand.equals(PHONE_SONY)) {
+//            result.success(null);
+//        } else if (brand.equals(PHONE_SAMSUNG)) {
+//            result.success(null);
+//        } else if (brand.equals(PHONE_LG)) {
+//            result.success(null);
+//        } else if (brand.equals(PHONE_HTC)) {
+//            result.success(null);
+//        } else if (brand.equals(PHONE_NOVA)) {
+//            result.success(null);
+//        } else if (brand.equals(PHONE_LeMobile)) {
+//            result.success(null);
+//        } else if (brand.equals(PHONE_LENOVO)) {
+//            result.success(null);
+//        } else {
+//            result.success(null);
+//        }
+//    }
 
     /**
      * 申请华为Push Token
@@ -104,13 +97,12 @@ public class DeviceTokenHelper {
      */
     public void getHmsPushToken(MethodChannel.Result result) {
         try {
-            hmsPushTokenResult = result;
             // 判断是否启用FCM推送
 //            if (EMClient.getInstance().isFCMAvailable()) {
 //                return;
 //            }
             if (Class.forName("com.huawei.hms.api.HuaweiApiClient") == null) {
-                hmsPushTokenResultFailureSender("-1", "no huawei hms push sdk or mobile is not a huawei phone", null);
+                result.error("-1", "no huawei hms push sdk or mobile is not a huawei phone", null);
                 return;
             }
             Class<?> classType = Class.forName("android.os.SystemProperties");
@@ -118,7 +110,7 @@ public class DeviceTokenHelper {
             String buildVersion = (String) getMethod.invoke(classType, new Object[]{"ro.build.version.emui"});
             //在某些手机上，invoke方法不报错
             if (TextUtils.isEmpty(buildVersion)) {
-                hmsPushTokenResultFailureSender("-1", "huawei hms push is unavailable!", null);
+                result.error("-1", "huawei hms push is unavailable!", null);
                 return;
             }
             new Thread() {
@@ -149,10 +141,12 @@ public class DeviceTokenHelper {
                             return;
                         }
                         Log.d(TAG, "成功获取到token:" + token);
-                        hmsPushTokenResultSuccessSender(token);
+//                        hmsPushTokenResultSuccessSender(token);
+                        result.success(token);
                     } catch (Exception e) {
                         Log.e(TAG, "get token failed, " + e);
                         e.printStackTrace();
+                        result.error("-1", e.getMessage(), e.getStackTrace());
                     }
                 }
             }.start();
@@ -162,14 +156,67 @@ public class DeviceTokenHelper {
         }
     }
 
+    public void getOppoDeviceToken(MethodChannel.Result result) {
+        result.success(null);
+    }
+
+    public void getXiaomiDeviceToken(MethodChannel.Result result) {
+        result.success(null);
+    }
+
+    public void getMeizuDeviceToken(MethodChannel.Result result) {
+        result.success(null);
+    }
+
+    public void getSonyDeviceToken(MethodChannel.Result result) {
+        result.success(null);
+    }
+
+    public void getSamsungDeviceToken(MethodChannel.Result result) {
+        result.success(null);
+    }
+
+    public void getLgDeviceToken(MethodChannel.Result result) {
+        result.success(null);
+    }
+
+    public void getHtcDeviceToken(MethodChannel.Result result) {
+        result.success(null);
+    }
+
+    public void getNovaDeviceToken(MethodChannel.Result result) {
+        result.success(null);
+    }
+
+    public void getLeMobileDeviceToken(MethodChannel.Result result) {
+        result.success(null);
+    }
+
+    public void getLenovoDeviceToken(MethodChannel.Result result) {
+        result.success(null);
+    }
+
 
     public void onDispose() {
         this.mActivity.clear();
-        this.hmsPushTokenResult = null;
+        this.methodChannel.clear();
     }
 
     public void setActivity(WeakReference<Activity> mActivity) {
         this.mActivity = mActivity;
+    }
+
+    public void setMethodChannel(WeakReference<MethodChannel> methodChannel) {
+        this.methodChannel = methodChannel;
+    }
+
+
+    @Nullable
+    public MethodChannel getMethodChannel() {
+        if (this.methodChannel == null) {
+            return null;
+        }
+        return this.methodChannel.get();
     }
 }
 

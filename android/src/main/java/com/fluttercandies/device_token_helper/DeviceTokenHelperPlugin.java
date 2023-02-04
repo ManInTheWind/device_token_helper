@@ -20,7 +20,7 @@ import io.flutter.plugin.common.MethodChannel.Result;
 /**
  * DeviceTokenHelperPlugin
  */
-public class DeviceTokenHelperPlugin  implements FlutterPlugin, MethodCallHandler, ActivityAware {
+public class DeviceTokenHelperPlugin implements FlutterPlugin, MethodCallHandler, ActivityAware {
     /// The MethodChannel that will the communication between Flutter and native Android
     ///
     /// This local reference serves to register the plugin with the Flutter Engine and unregister it
@@ -34,19 +34,55 @@ public class DeviceTokenHelperPlugin  implements FlutterPlugin, MethodCallHandle
         channel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), "android_device_token_helper");
         channel.setMethodCallHandler(this);
         deviceTokenHelper = DeviceTokenHelper.getInstance();
+        deviceTokenHelper.setMethodChannel(new WeakReference<>(channel));
     }
 
     @Override
     public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
-        if (call.method.equals("getPlatformVersion")) {
-            result.success("Android " + android.os.Build.VERSION.RELEASE);
-        } else if (call.method.equals("getDeviceToken")) {
-            deviceTokenHelper.getDeviceToken(result);
-        } else {
-            result.notImplemented();
+        switch (call.method) {
+            case "getPlatformVersion":
+                result.success("Android " + Build.VERSION.RELEASE);
+                break;
+            case "DeviceBrand":
+                deviceTokenHelper.getDeviceBrand(result);
+            case "HuaweiDeviceToken":
+                deviceTokenHelper.getHmsPushToken(result);
+                break;
+            case "OppoDeviceToken":
+                deviceTokenHelper.getOppoDeviceToken(result);
+                break;
+            case "XiaomiDeviceToken":
+                deviceTokenHelper.getXiaomiDeviceToken(result);
+                break;
+            case "MeizuDeviceToken":
+                deviceTokenHelper.getMeizuDeviceToken(result);
+                break;
+            case "SonyDeviceToken":
+                deviceTokenHelper.getSonyDeviceToken(result);
+                break;
+            case "SamsungDeviceToken":
+                deviceTokenHelper.getSamsungDeviceToken(result);
+                break;
+            case "LgDeviceToken":
+                deviceTokenHelper.getLgDeviceToken(result);
+                break;
+            case "HtcDeviceToken":
+                deviceTokenHelper.getHtcDeviceToken(result);
+                break;
+            case "NovaDeviceToken":
+                deviceTokenHelper.getNovaDeviceToken(result);
+                break;
+            case "LeMobileDeviceToken":
+                deviceTokenHelper.getLeMobileDeviceToken(result);
+                break;
+            case "LenovoDeviceToken":
+                deviceTokenHelper.getLenovoDeviceToken(result);
+                break;
+            default:
+                result.notImplemented();
+                break;
         }
     }
-
 
 
     @Override
