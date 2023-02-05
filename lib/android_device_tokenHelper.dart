@@ -38,8 +38,17 @@ class AndroidDeviceTokenHelper extends DeviceTokenHelper {
     });
   }
 
-  Future<String?> getOppoDeviceToken() async {
-    return methodChannel.invokeMethod<String>('OppoDeviceToken');
+  Future<String?> getOppoDeviceToken({
+    required String appKey,
+    required String appSecret,
+    bool needLog = true,
+  }) async {
+    assert(appKey.isNotEmpty || appSecret.isNotEmpty, 'appKey或者appSecret不正确');
+    return methodChannel.invokeMethod<String>('OppoDeviceToken', {
+      'AppKey': appKey,
+      'AppSecret': appSecret,
+      'NeedLog': needLog,
+    });
   }
 
   Future<String?> getXiaomiDeviceToken() async {

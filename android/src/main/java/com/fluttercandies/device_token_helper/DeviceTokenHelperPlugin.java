@@ -45,11 +45,16 @@ public class DeviceTokenHelperPlugin implements FlutterPlugin, MethodCallHandler
                 break;
             case "DeviceBrand":
                 deviceTokenHelper.getDeviceBrand(result);
+                break;
             case "HuaweiDeviceToken":
                 deviceTokenHelper.getHmsPushToken(result);
                 break;
             case "OppoDeviceToken":
-                deviceTokenHelper.getOppoDeviceToken(result);
+                /**
+                 * arguments:{'AppID':'30956839','AppKey':'8924c4a5ca1e4bd8afdd2a7bac39e00c','AppSecret':'9f8ec31f0268431d9fa73a68b2b27cee'}
+                 * 只会用到 [AppKey] 和 [AppSecret]
+                 */
+                deviceTokenHelper.getOppoDeviceToken(call.arguments, result);
                 break;
             case "XiaomiDeviceToken":
                 deviceTokenHelper.getXiaomiDeviceToken(result);

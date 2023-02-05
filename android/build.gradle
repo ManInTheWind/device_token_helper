@@ -5,6 +5,8 @@ buildscript {
     repositories {
         google()
         mavenCentral()
+        // huawei repo
+        maven {url 'https://developer.huawei.com/repo/'}
     }
 
     dependencies {
@@ -16,6 +18,11 @@ rootProject.allprojects {
     repositories {
         google()
         mavenCentral()
+        // huawei repo
+        maven {url 'https://developer.huawei.com/repo/'}
+        flatDir {
+            dirs project(":device_token_helper").file("libs")
+        }
     }
 }
 
@@ -39,5 +46,10 @@ dependencies {
     //华为推送
     implementation 'com.huawei.hms:push:6.7.0.300'
     implementation 'com.huawei.hms:hmscoreinstaller:6.6.0.300'
-//    implementation 'io.hyphenate:hyphenate-chat:3.9.7'
+    //oppo推送
+    implementation(name: 'com.heytap.msp_3.1.0', ext: 'aar')
+    implementation 'com.google.code.gson:gson:2.6.2'
+    implementation 'commons-codec:commons-codec:1.6'
+    //(SDK中的接入最小依赖项，也可以参考demo中的依赖)
+    implementation 'com.android.support:support-annotations:28.0.0'
 }
