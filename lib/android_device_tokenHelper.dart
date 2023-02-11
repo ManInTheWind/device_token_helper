@@ -12,6 +12,10 @@ class AndroidDeviceTokenHelper extends DeviceTokenHelper {
     return methodChannel.invokeMethod<String>('DeviceBrand');
   }
 
+  Future<bool?> initOppoPush({bool needLog = false}) async {
+    return methodChannel.invokeMethod<bool>('initOppoPush', needLog);
+  }
+
   Future<String?> getHuaweiDeviceToken() async {
     return methodChannel.invokeMethod<String>('HuaweiDeviceToken');
   }

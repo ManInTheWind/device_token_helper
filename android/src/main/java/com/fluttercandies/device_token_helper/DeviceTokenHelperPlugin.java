@@ -49,6 +49,9 @@ public class DeviceTokenHelperPlugin implements FlutterPlugin, MethodCallHandler
             case "HuaweiDeviceToken":
                 deviceTokenHelper.getHmsPushToken(result);
                 break;
+            case "initOppoPush":
+                deviceTokenHelper.initOppoPush(call.arguments, result);
+                break;
             case "OppoDeviceToken":
                 /**
                  * arguments:{'AppID':'30956839','AppKey':'8924c4a5ca1e4bd8afdd2a7bac39e00c','AppSecret':'9f8ec31f0268431d9fa73a68b2b27cee'}

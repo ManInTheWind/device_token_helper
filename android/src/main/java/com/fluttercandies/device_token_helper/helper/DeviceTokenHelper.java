@@ -124,12 +124,31 @@ public class DeviceTokenHelper {
         }
     }
 
+    public void initOppoPush(Object arguments, MethodChannel.Result result) {
+        try {
+            Activity activity = mActivity.get();
+            if (activity == null) {
+                result.error("-1", "暂时无法获取Token，请检查页面调用是否正确", null);
+            }
+            boolean needLog = true;
+            if (arguments != null) {
+                needLog = ((boolean) arguments);
+            }
+            HeytapPushManager.init(activity, needLog);
+            boolean supportPush = HeytapPushManager.isSupportPush(activity);
+            result.success(supportPush);
+        } catch (Exception e) {
+            result.error("-1", "初始化失败", null);
+        }
+    }
+
     /**
      * 获取Oppo的DeviceToken
      * arguments:{'AppID':'30956839','AppKey':'8924c4a5ca1e4bd8afdd2a7bac39e00c','AppSecret':'9f8ec31f0268431d9fa73a68b2b27cee'}
      * 只会用到 [AppKey] 和 [AppSecret]
      * 所有回调都需要根据responseCode来判断操作是否成功，0 代表成功,其他代码失败，失败具体原因可以查阅附录中的错误码列表。
      * onRegister接口返回的registerID是当前客户端的唯一标识，app开发者可以上传保存到应用服务器中,在发送push消息是可以指定registerID发送。
+     *
      * @param arguments 需要传入[AppKey] 和 [AppSecret]
      * @param result    flutter回调
      */
@@ -211,11 +230,11 @@ public class DeviceTokenHelper {
             }
 
         };
-        HeytapPushManager.init(activity,needLog);
         HeytapPushManager.register(activity, appKey, appSecret, oppoPushTokenCallback);
         HeytapPushManager.requestNotificationPermission();
         result.success(null);
     }
+
 
     public void getXiaomiDeviceToken(MethodChannel.Result result) {
         result.success(null);
