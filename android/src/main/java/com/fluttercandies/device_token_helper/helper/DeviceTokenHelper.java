@@ -106,6 +106,7 @@ public class DeviceTokenHelper {
                             I/HMSSDK_HmsMessageService(30392): handle message start...
                             I/HMSSDK_HmsMessageService(30392): onNewToken
                              */
+                            result.error("-1", "获取token失败", null);
                             return;
                         }
                         Log.d(TAG, "成功获取到token:" + token);
